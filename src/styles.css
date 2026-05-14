@@ -1,0 +1,94 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  color: #181a2e;
+  background: #fbf8ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.theme-sunny {
+  background:
+    linear-gradient(180deg, rgba(80, 217, 254, 0.82), rgba(255, 240, 186, 0.8) 42%, #fbf8ff 92%),
+    #fbf8ff;
+}
+
+.theme-maybe {
+  background:
+    linear-gradient(135deg, rgba(255, 223, 158, 0.92), rgba(179, 235, 255, 0.9) 58%, rgba(251, 248, 255, 0.95)),
+    #fbf8ff;
+}
+
+.theme-rainy {
+  background:
+    linear-gradient(180deg, rgba(15, 17, 33, 0.92), rgba(16, 20, 37, 0.78)),
+    #101425;
+}
+
+.hero-glass {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.56), 0 26px 90px rgba(24, 26, 46, 0.14);
+  backdrop-filter: blur(28px);
+}
+
+.theme-rainy .hero-glass {
+  background: rgba(15, 17, 33, 0.78);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.12), 0 26px 90px rgba(0, 0, 0, 0.3);
+}
+
+.glass-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(22px);
+}
+
+.theme-rainy .glass-card {
+  border-color: rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.icon-button {
+  display: grid;
+  height: 44px;
+  width: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.42);
+  color: #181a2e;
+  backdrop-filter: blur(18px);
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.icon-button:hover {
+  background: rgba(255, 255, 255, 0.68);
+  transform: translateY(-1px);
+}
+
+.icon-button:active {
+  transform: translateY(0) scale(0.96);
+}
+
+svg {
+  flex-shrink: 0;
+}
