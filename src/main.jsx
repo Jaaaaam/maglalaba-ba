@@ -262,6 +262,7 @@ function App() {
   const [suggestions, setSuggestions] = useState([])
   const [suggestionsOpen, setSuggestionsOpen] = useState(false)
   const [suggestionsLoading, setSuggestionsLoading] = useState(false)
+  const [searchLoading, setSearchLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -272,7 +273,11 @@ function App() {
     fetchForecast(place)
       .then((data) => alive && setForecast(data))
       .catch((err) => alive && setError(err.message || 'Forecast failed'))
-      .finally(() => alive && setLoading(false))
+      .finally(() => {
+        if (!alive) return
+        setLoading(false)
+        setSearchLoading(false)
+      })
     return () => {
       alive = false
     }
@@ -344,6 +349,7 @@ function App() {
   )
 
   async function choosePlace(nextPlace) {
+    setSearchLoading(true)
     setLoading(true)
     setError('')
     setSuggestionsOpen(false)
@@ -356,11 +362,13 @@ function App() {
     event.preventDefault()
     const trimmed = query.trim()
     if (!trimmed) return
+    setSearchLoading(true)
     try {
       await choosePlace(suggestions[0] ?? (await searchPlace(trimmed)))
     } catch (err) {
       setError(err.message || 'Search failed')
       setLoading(false)
+      setSearchLoading(false)
     }
   }
 
@@ -370,14 +378,21 @@ function App() {
       return
     }
     navigator.geolocation.getCurrentPosition(
-      (position) =>
+      (position) => {
+        setSearchLoading(true)
+        setLoading(true)
+        setError('')
         setPlace({
           name: 'Your spot',
           country: 'Current location',
           latitude: position.coords.latitude,
           longitude: position.coords.longitude
-        }),
-      () => setError('Location permission was blocked')
+        })
+      },
+      () => {
+        setError('Location permission was blocked')
+        setSearchLoading(false)
+      }
     )
   }
 
@@ -404,8 +419,12 @@ function App() {
                   onChange={(event) => setQuery(event.target.value)}
                   onFocus={() => suggestions.length && setSuggestionsOpen(true)}
                   placeholder="Search city"
-                  className="w-full rounded-full border border-white/40 bg-white/45 py-3 pl-10 pr-4 text-sm font-semibold text-ink outline-none backdrop-blur-xl placeholder:text-ink/50 focus:border-sun"
+                  disabled={searchLoading}
+                  className="w-full rounded-full border border-white/40 bg-white/45 py-3 pl-10 pr-10 text-sm font-semibold text-ink outline-none backdrop-blur-xl placeholder:text-ink/50 focus:border-sun disabled:cursor-wait disabled:opacity-75"
                 />
+                {(suggestionsLoading || searchLoading) && (
+                  <RefreshCw className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-sky" />
+                )}
               </label>
               {suggestionsOpen && (suggestions.length > 0 || suggestionsLoading) && (
                 <div className="suggestions-panel absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-2xl border border-white/45 bg-white/85 text-left text-ink shadow-2xl backdrop-blur-2xl">
@@ -416,6 +435,7 @@ function App() {
                       <button
                         key={`${suggestion.id}-${suggestion.latitude}-${suggestion.longitude}`}
                         className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-sun/20 focus:bg-sun/20 focus:outline-none"
+                        disabled={searchLoading}
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => choosePlace(suggestion)}
                         type="button"
@@ -433,10 +453,10 @@ function App() {
                 </div>
               )}
             </div>
-            <button className="icon-button" aria-label="Search city" type="submit">
-              <Search size={19} />
+            <button className="icon-button" aria-label={searchLoading ? 'Searching city' : 'Search city'} disabled={searchLoading} type="submit">
+              {searchLoading ? <RefreshCw className="animate-spin" size={19} /> : <Search size={19} />}
             </button>
-            <button className="icon-button" aria-label="Use my location" type="button" onClick={useMyLocation}>
+            <button className="icon-button" aria-label="Use my location" disabled={searchLoading} type="button" onClick={useMyLocation}>
               <LocateFixed size={19} />
             </button>
           </form>

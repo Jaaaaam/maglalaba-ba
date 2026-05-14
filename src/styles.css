@@ -90,6 +90,16 @@ body {
   transform: translateY(-1px);
 }
 
+.icon-button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.icon-button:disabled:hover {
+  background: rgba(255, 255, 255, 0.42);
+  transform: none;
+}
+
 .icon-button:active {
   transform: translateY(0) scale(0.96);
 }
