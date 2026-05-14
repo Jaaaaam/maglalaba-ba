@@ -194,18 +194,25 @@ async function fetchForecast(place) {
 }
 
 async function searchPlace(query) {
-  const params = new URLSearchParams({ name: query, count: '1', language: 'en', format: 'json' })
-  const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?${params}`)
+  const results = await searchPlaces(query, 1)
+  if (!results.length) throw new Error('No matching city found')
+  return results[0]
+}
+
+async function searchPlaces(query, count = 6, signal) {
+  const params = new URLSearchParams({ name: query, count: String(count), language: 'en', format: 'json' })
+  const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?${params}`, { signal })
   if (!res.ok) throw new Error('Could not search that city')
   const data = await res.json()
-  if (!data.results?.length) throw new Error('No matching city found')
-  const place = data.results[0]
-  return {
+  if (signal?.aborted) return []
+  return (data.results ?? []).map((place) => ({
+    id: place.id,
     name: place.name,
+    admin1: place.admin1,
     country: place.country,
     latitude: place.latitude,
     longitude: place.longitude
-  }
+  }))
 }
 
 function GaugeRing({ score, theme }) {
@@ -252,6 +259,9 @@ function App() {
   const [place, setPlace] = useState(DEFAULT_PLACE)
   const [forecast, setForecast] = useState(null)
   const [query, setQuery] = useState('')
+  const [suggestions, setSuggestions] = useState([])
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false)
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -267,6 +277,40 @@ function App() {
       alive = false
     }
   }, [place])
+
+  useEffect(() => {
+    const trimmed = query.trim()
+    if (trimmed.length < 2) {
+      setSuggestions([])
+      setSuggestionsOpen(false)
+      setSuggestionsLoading(false)
+      return
+    }
+
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => {
+      setSuggestionsLoading(true)
+      searchPlaces(trimmed, 6, controller.signal)
+        .then((results) => {
+          if (controller.signal.aborted) return
+          setSuggestions(results)
+          setSuggestionsOpen(true)
+        })
+        .catch(() => {
+          if (controller.signal.aborted) return
+          setSuggestions([])
+          setSuggestionsOpen(false)
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setSuggestionsLoading(false)
+        })
+    }, 220)
+
+    return () => {
+      controller.abort()
+      window.clearTimeout(timeout)
+    }
+  }, [query])
 
   const theme = forecast?.verdict.key ?? 'maybe'
   const current = forecast?.current
@@ -299,14 +343,21 @@ function App() {
     []
   )
 
-  async function onSearch(event) {
-    event.preventDefault()
-    if (!query.trim()) return
+  async function choosePlace(nextPlace) {
     setLoading(true)
     setError('')
+    setSuggestionsOpen(false)
+    setSuggestions([])
+    setQuery('')
+    setPlace(nextPlace)
+  }
+
+  async function onSearch(event) {
+    event.preventDefault()
+    const trimmed = query.trim()
+    if (!trimmed) return
     try {
-      setPlace(await searchPlace(query.trim()))
-      setQuery('')
+      await choosePlace(suggestions[0] ?? (await searchPlace(trimmed)))
     } catch (err) {
       setError(err.message || 'Search failed')
       setLoading(false)
@@ -344,15 +395,44 @@ function App() {
             <h1 className="min-w-0 text-xl font-extrabold text-current sm:text-2xl md:text-3xl">Maglalaba ba?</h1>
           </div>
           <form onSubmit={onSearch} className="grid min-w-0 grid-cols-[1fr_auto_auto] gap-2 md:flex md:flex-1 md:justify-end md:max-w-lg">
-            <label className="relative min-w-0 flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 opacity-60" size={18} />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search city"
-                className="w-full rounded-full border border-white/40 bg-white/45 py-3 pl-10 pr-4 text-sm font-semibold text-ink outline-none backdrop-blur-xl placeholder:text-ink/50 focus:border-sun"
-              />
-            </label>
+            <div className="relative min-w-0 flex-1">
+              <label className="relative block min-w-0">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 opacity-60" size={18} />
+                <input
+                  value={query}
+                  onBlur={() => window.setTimeout(() => setSuggestionsOpen(false), 120)}
+                  onChange={(event) => setQuery(event.target.value)}
+                  onFocus={() => suggestions.length && setSuggestionsOpen(true)}
+                  placeholder="Search city"
+                  className="w-full rounded-full border border-white/40 bg-white/45 py-3 pl-10 pr-4 text-sm font-semibold text-ink outline-none backdrop-blur-xl placeholder:text-ink/50 focus:border-sun"
+                />
+              </label>
+              {suggestionsOpen && (suggestions.length > 0 || suggestionsLoading) && (
+                <div className="suggestions-panel absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-2xl border border-white/45 bg-white/85 text-left text-ink shadow-2xl backdrop-blur-2xl">
+                  {suggestionsLoading && suggestions.length === 0 ? (
+                    <div className="px-4 py-3 text-sm font-semibold text-ink/60">Looking for that sampayan spot...</div>
+                  ) : (
+                    suggestions.map((suggestion) => (
+                      <button
+                        key={`${suggestion.id}-${suggestion.latitude}-${suggestion.longitude}`}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-sun/20 focus:bg-sun/20 focus:outline-none"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => choosePlace(suggestion)}
+                        type="button"
+                      >
+                        <MapPin className="h-4 w-4 shrink-0 text-sky" />
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-extrabold">{suggestion.name}</span>
+                          <span className="block truncate text-xs font-semibold text-ink/60">
+                            {[suggestion.admin1, suggestion.country].filter(Boolean).join(', ')}
+                          </span>
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
             <button className="icon-button" aria-label="Search city" type="submit">
               <Search size={19} />
             </button>
