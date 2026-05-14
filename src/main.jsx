@@ -212,7 +212,7 @@ function GaugeRing({ score, theme }) {
   const circumference = 251.2
   const offset = circumference - (score / 100) * circumference
   return (
-    <div className="relative flex h-36 w-36 items-center justify-center">
+    <div className="relative flex h-28 w-28 items-center justify-center sm:h-36 sm:w-36">
       <svg className="-rotate-90 drop-shadow-lg" viewBox="0 0 100 100">
         <circle cx="50" cy="50" r="40" fill="transparent" stroke="currentColor" className="text-white/25" strokeWidth="9" />
         <circle
@@ -233,17 +233,17 @@ function GaugeRing({ score, theme }) {
           </linearGradient>
         </defs>
       </svg>
-      <span className="absolute text-4xl font-extrabold">{score}%</span>
+      <span className="absolute text-3xl font-extrabold sm:text-4xl">{score}%</span>
     </div>
   )
 }
 
 function Metric({ icon, label, value }) {
   return (
-    <div className="glass-card min-h-32 rounded-2xl p-4 text-center">
-      <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center text-aqua">{icon}</div>
+    <div className="glass-card min-h-28 rounded-2xl p-3 text-center sm:min-h-32 sm:p-4">
+      <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center text-aqua sm:h-9 sm:w-9">{icon}</div>
       <p className="text-xs font-semibold uppercase tracking-[0.05em] opacity-70">{label}</p>
-      <p className="mt-1 text-2xl font-bold">{value}</p>
+      <p className="mt-1 max-w-full break-words text-xl font-bold leading-tight sm:text-2xl">{value}</p>
     </div>
   )
 }
@@ -338,12 +338,12 @@ function App() {
       </div>
 
       <header className="sticky top-0 z-20 border-b border-white/20 bg-white/20 backdrop-blur-3xl">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-4 md:px-8">
-          <div className="flex items-center gap-3">
-            <Shirt className="text-current" />
-            <h1 className="text-2xl font-extrabold text-current md:text-3xl">Maglalaba ba?</h1>
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:px-5 md:flex-row md:items-center md:justify-between md:px-8 md:py-4">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <Shirt className="h-6 w-6 text-current sm:h-7 sm:w-7" />
+            <h1 className="min-w-0 text-xl font-extrabold text-current sm:text-2xl md:text-3xl">Maglalaba ba?</h1>
           </div>
-          <form onSubmit={onSearch} className="flex min-w-0 flex-1 justify-end gap-2 md:max-w-lg">
+          <form onSubmit={onSearch} className="grid min-w-0 grid-cols-[1fr_auto_auto] gap-2 md:flex md:flex-1 md:justify-end md:max-w-lg">
             <label className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 opacity-60" size={18} />
               <input
@@ -363,9 +363,9 @@ function App() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl space-y-5 px-5 py-6 md:px-8 md:py-8">
-        <section className="hero-glass rounded-[2rem] p-6 text-center md:p-10">
-          <div className="mb-4 flex items-center justify-center gap-2 text-sm font-bold uppercase tracking-[0.16em] text-sky">
+      <div className="mx-auto max-w-6xl space-y-4 px-3 py-4 sm:px-5 sm:py-6 md:space-y-5 md:px-8 md:py-8">
+        <section className="hero-glass rounded-3xl p-4 text-center sm:p-6 md:rounded-[2rem] md:p-10">
+          <div className="mb-4 flex flex-wrap items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-sky sm:text-sm sm:tracking-[0.16em]">
             <MapPin size={17} />
             {place.name}, {place.country}
           </div>
@@ -381,18 +381,18 @@ function App() {
             </div>
           ) : (
             <>
-              <div className={cls('mx-auto mb-3 flex justify-center', theme === 'rainy' ? 'text-aqua' : 'text-gold')}>{themeMeta[theme].icon}</div>
+              <div className={cls('mx-auto mb-3 flex scale-75 justify-center sm:scale-100', theme === 'rainy' ? 'text-aqua' : 'text-gold')}>{themeMeta[theme].icon}</div>
               <p className="text-xs font-extrabold uppercase tracking-[0.18em] opacity-70">Current verdict</p>
-              <h2 className="mt-2 text-5xl font-extrabold leading-none md:text-7xl">{forecast.verdict.label}</h2>
-              <p className="mx-auto mt-4 max-w-3xl text-lg font-semibold md:text-2xl">{forecast.verdict.line}</p>
+              <h2 className="mx-auto mt-2 max-w-full text-[clamp(2.15rem,13vw,4.5rem)] font-extrabold leading-none md:text-7xl">{forecast.verdict.label}</h2>
+              <p className="mx-auto mt-4 max-w-3xl text-base font-semibold leading-snug sm:text-lg md:text-2xl">{forecast.verdict.line}</p>
 
-              <div className="mt-8 grid gap-4 md:grid-cols-[1.15fr_.85fr]">
-                <div className="glass-card rounded-2xl p-6">
+              <div className="mt-6 grid gap-3 sm:gap-4 md:mt-8 md:grid-cols-[1.15fr_.85fr]">
+                <div className="glass-card rounded-2xl p-4 sm:p-6">
                   <p className="text-xs font-bold uppercase tracking-[0.08em] opacity-70">Drying power</p>
                   <GaugeRing score={forecast.score} theme={theme} />
-                  <p className="mx-auto mt-2 inline-flex rounded-full bg-aqua/20 px-4 py-2 text-sm font-extrabold text-sky">{forecast.verdict.chip}</p>
+                  <p className="mx-auto mt-2 inline-flex max-w-full rounded-full bg-aqua/20 px-3 py-2 text-center text-xs font-extrabold text-sky sm:px-4 sm:text-sm">{forecast.verdict.chip}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
                   <Metric icon={<Thermometer />} label="Temp" value={`${Math.round(current.temperature_2m)}°C`} />
                   <Metric icon={<Droplets />} label="Humidity" value={`${Math.round(current.relative_humidity_2m)}%`} />
                   <Metric icon={<Wind />} label="Wind" value={`${Math.round(current.wind_speed_10m)} km/h`} />
@@ -405,17 +405,17 @@ function App() {
 
         {forecast && !loading && (
           <>
-            <section className="hero-glass rounded-[2rem] p-5 md:p-7">
-              <div className="mb-7 flex items-center gap-3">
+            <section className="hero-glass rounded-3xl p-4 sm:p-5 md:rounded-[2rem] md:p-7">
+              <div className="mb-5 flex items-center gap-3 md:mb-7">
                 <Timer className="text-aqua" />
-                <h3 className="text-2xl font-bold">Drying Timeline</h3>
+                <h3 className="text-xl font-bold sm:text-2xl">Drying Timeline</h3>
               </div>
-              <div className="grid gap-3 md:grid-cols-5">
+              <div className="scroll-strip -mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:-mx-5 sm:px-5 md:mx-0 md:grid md:grid-cols-5 md:overflow-visible md:px-0 md:pb-0">
                 {forecast.timeline.map((hour) => {
                   const score = scoreHour(hour)
                   const verdict = verdictFromScore(score, hour.precipitation_probability, hour.weather_code)
                   return (
-                    <div key={hour.time} className="glass-card rounded-2xl p-4 text-center">
+                    <div key={hour.time} className="glass-card min-w-36 shrink-0 snap-start rounded-2xl p-3 text-center sm:p-4 md:min-w-0 md:shrink">
                       <div className={cls('mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full', verdict.key === 'rainy' ? 'bg-red-500/20 text-red-500' : 'bg-aqua/20 text-sky')}>
                         {weatherIcon(hour.weather_code, 23)}
                       </div>
@@ -429,21 +429,21 @@ function App() {
             </section>
 
             <section className="space-y-4">
-              <div className="flex items-center gap-3 px-2">
+              <div className="flex items-center gap-3 px-1 sm:px-2">
                 <Gauge className="text-aqua" />
-                <h3 className="text-2xl font-bold">Weekly Forecast</h3>
+                <h3 className="text-xl font-bold sm:text-2xl">Weekly Forecast</h3>
               </div>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-7">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-7">
                 {forecast.daily.map((day, index) => (
-                  <article key={day.time} className="glass-card rounded-2xl p-4 text-center">
+                  <article key={day.time} className="glass-card rounded-2xl p-3 text-center sm:p-4">
                     <p className="text-xs font-bold uppercase tracking-[0.08em] opacity-70">
                       {index === 0 ? 'Today' : new Date(day.time).toLocaleDateString([], { weekday: 'short' })}
                     </p>
                     <div className={cls('mx-auto my-3 flex justify-center', day.verdict.key === 'rainy' ? 'text-red-500' : day.verdict.key === 'sunny' ? 'text-sun' : 'text-aqua')}>
                       {weatherIcon(day.code, 30)}
                     </div>
-                    <p className="text-2xl font-extrabold">{day.verdict.short}</p>
-                    <p className="mt-2 text-xs font-semibold opacity-70">{day.tempMax}°C · {day.rainChance}% rain</p>
+                    <p className="text-xl font-extrabold sm:text-2xl">{day.verdict.short}</p>
+                    <p className="mt-2 text-[11px] font-semibold leading-snug opacity-70 sm:text-xs">{day.tempMax}°C · {day.rainChance}% rain</p>
                   </article>
                 ))}
               </div>

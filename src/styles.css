@@ -18,6 +18,11 @@ body {
   margin: 0;
 }
 
+html,
+body {
+  overflow-x: hidden;
+}
+
 .theme-sunny {
   background:
     linear-gradient(180deg, rgba(80, 217, 254, 0.82), rgba(255, 240, 186, 0.8) 42%, #fbf8ff 92%),
@@ -89,6 +94,27 @@ body {
   transform: translateY(0) scale(0.96);
 }
 
+.scroll-strip {
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.scroll-strip::-webkit-scrollbar {
+  display: none;
+}
+
 svg {
   flex-shrink: 0;
+}
+
+@media (max-width: 420px) {
+  .hero-glass {
+    backdrop-filter: blur(20px);
+  }
+
+  .icon-button {
+    height: 42px;
+    width: 42px;
+    flex-basis: 42px;
+  }
 }
