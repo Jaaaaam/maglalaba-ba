@@ -107,6 +107,21 @@ function verdictFromScore(score, rainChance, code) {
   }
 }
 
+function getLaundryWindow(hours, now) {
+  const futureDaylight = hours.filter((hour) => {
+    const date = new Date(hour.time)
+    const hourOfDay = date.getHours()
+    return date >= now && hourOfDay >= 7 && hourOfDay <= 17
+  })
+
+  if (!futureDaylight.length) {
+    return hours.filter((hour) => new Date(hour.time) >= now).slice(0, 10)
+  }
+
+  const targetDay = new Date(futureDaylight[0].time).toDateString()
+  return futureDaylight.filter((hour) => new Date(hour.time).toDateString() === targetDay)
+}
+
 function unpackForecast(data) {
   const now = new Date()
   const hours = data.hourly.time.map((time, index) => ({
@@ -122,11 +137,7 @@ function unpackForecast(data) {
 
   const future = hours.filter((hour) => new Date(hour.time) >= now)
   const current = future[0] ?? hours[0]
-  const daylightHours = hours.filter((hour) => {
-    const date = new Date(hour.time)
-    return date.toDateString() === now.toDateString() && date.getHours() >= 7 && date.getHours() <= 17
-  })
-  const laundryWindow = daylightHours.length ? daylightHours : future.slice(0, 10)
+  const laundryWindow = getLaundryWindow(hours, now)
   const averageScore = Math.round(laundryWindow.reduce((sum, hour) => sum + scoreHour(hour), 0) / laundryWindow.length)
   const worstRain = Math.max(...laundryWindow.map((hour) => hour.precipitation_probability))
   const wettest = laundryWindow.reduce((max, hour) => (hour.precipitation_probability > max.precipitation_probability ? hour : max), laundryWindow[0])
