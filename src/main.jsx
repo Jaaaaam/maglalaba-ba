@@ -68,17 +68,33 @@ function weatherIcon(code, size = 34) {
 }
 
 function scoreHour(hour) {
-  const tempScore = clamp((hour.temperature_2m - 22) * 5, 0, 35)
-  const humidityScore = clamp((88 - hour.relative_humidity_2m) * 0.75, 0, 30)
-  const windScore = clamp(hour.wind_speed_10m * 1.4, 0, 22)
-  const uvScore = clamp(hour.uv_index * 5, 0, 25)
-  const rainPenalty = clamp(hour.precipitation_probability * 0.95 + hour.precipitation * 22, 0, 80)
-  const codePenalty = isWetCode(hour.weather_code) ? 28 : hour.weather_code === 3 ? 10 : 0
-  return Math.round(clamp(18 + tempScore + humidityScore + windScore + uvScore - rainPenalty - codePenalty, 0, 100))
+  const tempScore = clamp((hour.temperature_2m - 23) * 4.2, 0, 30)
+  const humidityScore = clamp((86 - hour.relative_humidity_2m) * 0.55, 0, 24)
+  const windScore = clamp(hour.wind_speed_10m * 1.2, 0, 18)
+  const uvScore = clamp(hour.uv_index * 4, 0, 18)
+  const rainPenalty = clamp(hour.precipitation_probability * 0.45 + hour.precipitation * 16, 0, 55)
+  const codePenalty = isWetCode(hour.weather_code) ? 14 : hour.weather_code === 3 ? 5 : 0
+  return Math.round(clamp(22 + tempScore + humidityScore + windScore + uvScore - rainPenalty - codePenalty, 0, 100))
 }
 
-function verdictFromScore(score, rainChance, code) {
-  if (score >= 72 && rainChance < 35 && !isWetCode(code)) {
+function verdictFromScore(score, rainChance, code, context = {}) {
+  const windowHours = context.windowHours ?? 0
+  const averageRain = context.averageRain ?? rainChance
+  const wetHours = context.wetHours ?? 0
+  const precipitationTotal = context.precipitationTotal ?? 0
+  const current = context.current
+  const wetHourShare = windowHours ? wetHours / windowHours : 0
+  const currentlyDry = current ? !isWetCode(current.weather_code) && (current.precipitation ?? 0) <= 0.1 : !isWetCode(code)
+  const hotDryNow = current ? currentlyDry && current.temperature_2m >= 29 && current.relative_humidity_2m <= 78 : false
+  const widespreadRain = wetHourShare >= 0.35
+  const dailyWetRisk = !windowHours && isWetCode(code) && rainChance >= 70
+  const soggyWindow =
+    dailyWetRisk ||
+    precipitationTotal >= 3 ||
+    (rainChance >= 85 && widespreadRain) ||
+    (isWetCode(code) && rainChance >= 80 && wetHours >= 2)
+
+  if (!soggyWindow && score >= 68 && averageRain < 45 && rainChance < 65 && currentlyDry) {
     return {
       key: 'sunny',
       label: 'OO / GO',
@@ -88,7 +104,17 @@ function verdictFromScore(score, rainChance, code) {
     }
   }
 
-  if (score >= 40 && rainChance < 70) {
+  if (!soggyWindow && hotDryNow && score >= 42) {
+    return {
+      key: 'maybe',
+      label: 'SIGURO / MAYBE',
+      chip: 'Mainit ngayon, pero bantay ulap',
+      line: 'Hot and dry right now, so may laban ang sampay. Check mo lang ulit mamaya bago ka mag-full laundry era.',
+      short: 'SIGURO'
+    }
+  }
+
+  if (!soggyWindow && score >= 45 && (rainChance < 82 || !widespreadRain)) {
     return {
       key: 'maybe',
       label: 'SIGURO / MAYBE',
@@ -140,8 +166,17 @@ function unpackForecast(data) {
   const laundryWindow = getLaundryWindow(hours, now)
   const averageScore = Math.round(laundryWindow.reduce((sum, hour) => sum + scoreHour(hour), 0) / laundryWindow.length)
   const worstRain = Math.max(...laundryWindow.map((hour) => hour.precipitation_probability))
+  const averageRain = Math.round(laundryWindow.reduce((sum, hour) => sum + hour.precipitation_probability, 0) / laundryWindow.length)
+  const wetHours = laundryWindow.filter((hour) => isWetCode(hour.weather_code) || hour.precipitation >= 0.2).length
+  const precipitationTotal = Number(laundryWindow.reduce((sum, hour) => sum + hour.precipitation, 0).toFixed(1))
   const wettest = laundryWindow.reduce((max, hour) => (hour.precipitation_probability > max.precipitation_probability ? hour : max), laundryWindow[0])
-  const verdict = verdictFromScore(averageScore, worstRain, wettest?.weather_code ?? current.weather_code)
+  const verdict = verdictFromScore(averageScore, worstRain, wettest?.weather_code ?? current.weather_code, {
+    averageRain,
+    current,
+    precipitationTotal,
+    wetHours,
+    windowHours: laundryWindow.length
+  })
 
   const daily = data.daily.time.map((time, index) => {
     const rainChance = data.daily.precipitation_probability_max[index] ?? 0
