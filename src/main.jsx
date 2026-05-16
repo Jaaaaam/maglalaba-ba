@@ -20,6 +20,7 @@ import {
 import './styles.css'
 
 const DEFAULT_PLACE = { name: 'Manila', country: 'Philippines', latitude: 14.5995, longitude: 120.9842 }
+const AVERAGE_DRYING_HOURS = 4
 
 const WMO = {
   0: 'Clear sky',
@@ -90,11 +91,11 @@ function verdictFromScore(score, rainChance, code, context = {}) {
   const dailyWetRisk = !windowHours && isWetCode(code) && rainChance >= 70
   const soggyWindow =
     dailyWetRisk ||
-    precipitationTotal >= 3 ||
-    (rainChance >= 85 && widespreadRain) ||
-    (isWetCode(code) && rainChance >= 80 && wetHours >= 2)
+    precipitationTotal >= 2.5 ||
+    (rainChance >= 85 && widespreadRain && averageRain >= 60) ||
+    (isWetCode(code) && wetHours >= 2 && precipitationTotal >= 0.8)
 
-  if (!soggyWindow && score >= 68 && averageRain < 45 && rainChance < 65 && currentlyDry) {
+  if (!soggyWindow && score >= 64 && averageRain < 55 && wetHourShare < 0.34 && currentlyDry) {
     return {
       key: 'sunny',
       label: 'OO / GO',
@@ -104,7 +105,7 @@ function verdictFromScore(score, rainChance, code, context = {}) {
     }
   }
 
-  if (!soggyWindow && hotDryNow && score >= 42) {
+  if (!soggyWindow && hotDryNow && score >= 42 && averageRain < 70) {
     return {
       key: 'maybe',
       label: 'SIGURO / MAYBE',
@@ -114,7 +115,7 @@ function verdictFromScore(score, rainChance, code, context = {}) {
     }
   }
 
-  if (!soggyWindow && score >= 45 && (rainChance < 82 || !widespreadRain)) {
+  if (!soggyWindow && score >= 45 && averageRain < 75) {
     return {
       key: 'maybe',
       label: 'SIGURO / MAYBE',
@@ -133,6 +134,25 @@ function verdictFromScore(score, rainChance, code, context = {}) {
   }
 }
 
+function summarizeLaundryWindow(window) {
+  const averageScore = Math.round(window.reduce((sum, hour) => sum + scoreHour(hour), 0) / window.length)
+  const worstRain = Math.max(...window.map((hour) => hour.precipitation_probability))
+  const averageRain = Math.round(window.reduce((sum, hour) => sum + hour.precipitation_probability, 0) / window.length)
+  const wetHours = window.filter((hour) => isWetCode(hour.weather_code) || hour.precipitation >= 0.2).length
+  const precipitationTotal = Number(window.reduce((sum, hour) => sum + hour.precipitation, 0).toFixed(1))
+  const wettest = window.reduce((max, hour) => (hour.precipitation_probability > max.precipitation_probability ? hour : max), window[0])
+
+  return {
+    averageScore,
+    worstRain,
+    averageRain,
+    wetHours,
+    precipitationTotal,
+    wettest,
+    windowHours: window.length
+  }
+}
+
 function getLaundryWindow(hours, now) {
   const futureDaylight = hours.filter((hour) => {
     const date = new Date(hour.time)
@@ -146,6 +166,27 @@ function getLaundryWindow(hours, now) {
 
   const targetDay = new Date(futureDaylight[0].time).toDateString()
   return futureDaylight.filter((hour) => new Date(hour.time).toDateString() === targetDay)
+}
+
+function getBestLaundryWindow(hours, now) {
+  const possibleHours = getLaundryWindow(hours, now)
+  const windowLength = Math.min(AVERAGE_DRYING_HOURS, possibleHours.length)
+
+  if (windowLength <= 1) {
+    return possibleHours
+  }
+
+  const windows = possibleHours
+    .map((_, index) => possibleHours.slice(index, index + windowLength))
+    .filter((window) => window.length === windowLength)
+
+  return windows.reduce((bestWindow, window) => {
+    const best = summarizeLaundryWindow(bestWindow)
+    const next = summarizeLaundryWindow(window)
+    const bestRank = best.averageScore - best.averageRain * 0.18 - best.wetHours * 8 - best.precipitationTotal * 12
+    const nextRank = next.averageScore - next.averageRain * 0.18 - next.wetHours * 8 - next.precipitationTotal * 12
+    return nextRank > bestRank ? window : bestWindow
+  }, windows[0])
 }
 
 function unpackForecast(data) {
@@ -163,19 +204,14 @@ function unpackForecast(data) {
 
   const future = hours.filter((hour) => new Date(hour.time) >= now)
   const current = future[0] ?? hours[0]
-  const laundryWindow = getLaundryWindow(hours, now)
-  const averageScore = Math.round(laundryWindow.reduce((sum, hour) => sum + scoreHour(hour), 0) / laundryWindow.length)
-  const worstRain = Math.max(...laundryWindow.map((hour) => hour.precipitation_probability))
-  const averageRain = Math.round(laundryWindow.reduce((sum, hour) => sum + hour.precipitation_probability, 0) / laundryWindow.length)
-  const wetHours = laundryWindow.filter((hour) => isWetCode(hour.weather_code) || hour.precipitation >= 0.2).length
-  const precipitationTotal = Number(laundryWindow.reduce((sum, hour) => sum + hour.precipitation, 0).toFixed(1))
-  const wettest = laundryWindow.reduce((max, hour) => (hour.precipitation_probability > max.precipitation_probability ? hour : max), laundryWindow[0])
-  const verdict = verdictFromScore(averageScore, worstRain, wettest?.weather_code ?? current.weather_code, {
-    averageRain,
+  const laundryWindow = getBestLaundryWindow(hours, now)
+  const summary = summarizeLaundryWindow(laundryWindow)
+  const verdict = verdictFromScore(summary.averageScore, summary.worstRain, summary.wettest?.weather_code ?? current.weather_code, {
+    averageRain: summary.averageRain,
     current,
-    precipitationTotal,
-    wetHours,
-    windowHours: laundryWindow.length
+    precipitationTotal: summary.precipitationTotal,
+    wetHours: summary.wetHours,
+    windowHours: summary.windowHours
   })
 
   const daily = data.daily.time.map((time, index) => {
@@ -205,9 +241,9 @@ function unpackForecast(data) {
 
   return {
     current,
-    score: averageScore,
-    rainChance: worstRain,
-    timeline: laundryWindow.filter((_, index) => index % 2 === 0).slice(0, 5),
+    score: summary.averageScore,
+    rainChance: summary.averageRain,
+    timeline: laundryWindow,
     daily,
     verdict
   }
@@ -531,7 +567,7 @@ function App() {
                   <Metric icon={<Thermometer />} label="Temp" value={`${Math.round(current.temperature_2m)}°C`} />
                   <Metric icon={<Droplets />} label="Humidity" value={`${Math.round(current.relative_humidity_2m)}%`} />
                   <Metric icon={<Wind />} label="Wind" value={`${Math.round(current.wind_speed_10m)} km/h`} />
-                  <Metric icon={<Waves />} label="Rain chance" value={`${forecast.rainChance}%`} />
+                  <Metric icon={<Waves />} label="Avg rain risk" value={`${forecast.rainChance}%`} />
                 </div>
               </div>
             </>
