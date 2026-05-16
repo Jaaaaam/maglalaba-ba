@@ -88,12 +88,14 @@ function verdictFromScore(score, rainChance, code, context = {}) {
   const currentlyDry = current ? !isWetCode(current.weather_code) && (current.precipitation ?? 0) <= 0.1 : !isWetCode(code)
   const hotDryNow = current ? currentlyDry && current.temperature_2m >= 29 && current.relative_humidity_2m <= 78 : false
   const widespreadRain = wetHourShare >= 0.35
-  const dailyWetRisk = !windowHours && isWetCode(code) && rainChance >= 70
+  const activeRainNow = current ? isWetCode(current.weather_code) && (current.precipitation ?? 0) >= 0.2 : false
+  const dailyWetRisk = !windowHours && isWetCode(code) && rainChance >= 80
   const soggyWindow =
     dailyWetRisk ||
-    precipitationTotal >= 2.5 ||
-    (rainChance >= 85 && widespreadRain && averageRain >= 60) ||
-    (isWetCode(code) && wetHours >= 2 && precipitationTotal >= 0.8)
+    activeRainNow ||
+    precipitationTotal >= 4 ||
+    (widespreadRain && averageRain >= 78) ||
+    (isWetCode(code) && wetHours >= 2 && precipitationTotal >= 1.5)
 
   if (!soggyWindow && score >= 64 && averageRain < 55 && wetHourShare < 0.34 && currentlyDry) {
     return {
@@ -115,7 +117,7 @@ function verdictFromScore(score, rainChance, code, context = {}) {
     }
   }
 
-  if (!soggyWindow && score >= 45 && averageRain < 75) {
+  if (!soggyWindow && (score >= 35 || averageRain < 85 || wetHourShare < 0.5)) {
     return {
       key: 'maybe',
       label: 'SIGURO / MAYBE',
