@@ -78,6 +78,58 @@ function scoreHour(hour) {
   return Math.round(clamp(22 + tempScore + humidityScore + windScore + uvScore - rainPenalty - codePenalty, 0, 100))
 }
 
+function getVerdictReasons(verdictKey, details) {
+  const reasons = []
+
+  if (verdictKey === 'maybe') {
+    if (details.hotDryNow) {
+      reasons.push('Mainit at dry ngayon, so may laban ang sampay habang cooperative pa ang langit.')
+    }
+
+    if (details.averageRain >= 55) {
+      reasons.push(`Average rain risk is ${details.averageRain}%, so may ulan subplot pero hindi pa siya final episode.`)
+    } else if (details.averageRain >= 35) {
+      reasons.push(`Average rain risk is ${details.averageRain}%, kaya puwede pa, basta ready kang sumilip sa bintana.`)
+    } else {
+      reasons.push(`Average rain risk is only ${details.averageRain}%, so the forecast is more side-eye than stop sign.`)
+    }
+
+    if (details.precipitationTotal <= 0.5) {
+      reasons.push('Expected actual rain is tiny, meaning the clouds are mostly making threats.')
+    } else if (details.wetHours > 0) {
+      reasons.push(`${details.wetHours} wet-ish hour${details.wetHours === 1 ? '' : 's'} in the drying window, so keep the sipit squad on standby.`)
+    }
+
+    if (details.score < 50) {
+      reasons.push('Drying power is not elite today, but it is not hopeless either.')
+    }
+  }
+
+  if (verdictKey === 'rainy') {
+    if (details.activeRainNow) {
+      reasons.push('It is already raining or wet right now. The labada is not asking for a second bath.')
+    }
+
+    if (details.precipitationTotal >= 4) {
+      reasons.push(`Expected rain adds up to ${details.precipitationTotal} mm in the drying window. That is not drizzle, that is a plot twist.`)
+    }
+
+    if (details.averageRain >= 78) {
+      reasons.push(`Average rain risk is ${details.averageRain}%, so the forecast is basically clearing its throat ominously.`)
+    }
+
+    if (details.wetHours >= 2) {
+      reasons.push(`${details.wetHours} wet hours are showing up in the drying window. Very uninvited behavior.`)
+    }
+
+    if (!reasons.length) {
+      reasons.push('The drying score is too low for a confident sampay moment today.')
+    }
+  }
+
+  return reasons.slice(0, 3)
+}
+
 function verdictFromScore(score, rainChance, code, context = {}) {
   const windowHours = context.windowHours ?? 0
   const averageRain = context.averageRain ?? rainChance
@@ -96,6 +148,7 @@ function verdictFromScore(score, rainChance, code, context = {}) {
     precipitationTotal >= 4 ||
     (widespreadRain && averageRain >= 78) ||
     (isWetCode(code) && wetHours >= 2 && precipitationTotal >= 1.5)
+  const details = { activeRainNow, averageRain, hotDryNow, precipitationTotal, score, wetHours }
 
   if (!soggyWindow && score >= 64 && averageRain < 55 && wetHourShare < 0.34 && currentlyDry) {
     return {
@@ -103,6 +156,7 @@ function verdictFromScore(score, rainChance, code, context = {}) {
       label: 'OO / GO',
       chip: 'Sampay confidence: main character',
       line: 'Maaraw, mahangin, at mukhang kakampi ang langit. Ilabas ang labada, pero huwag kalimutan ang sipit.',
+      reasons: [],
       short: 'OO'
     }
   }
@@ -113,6 +167,7 @@ function verdictFromScore(score, rainChance, code, context = {}) {
       label: 'SIGURO / MAYBE',
       chip: 'Mainit ngayon, pero bantay ulap',
       line: 'Hot and dry right now, so may laban ang sampay. Check mo lang ulit mamaya bago ka mag-full laundry era.',
+      reasons: getVerdictReasons('maybe', details),
       short: 'SIGURO'
     }
   }
@@ -123,6 +178,7 @@ function verdictFromScore(score, rainChance, code, context = {}) {
       label: 'SIGURO / MAYBE',
       chip: 'Bantayan mo ang sampay, bes',
       line: 'The sun is trying its best, pero may konting drama sa ulap department. Puwede, basta alerto.',
+      reasons: getVerdictReasons('maybe', details),
       short: 'SIGURO'
     }
   }
@@ -132,6 +188,7 @@ function verdictFromScore(score, rainChance, code, context = {}) {
     label: 'HINDI / NO',
     chip: 'Itabi ang sabon. Kape muna.',
     line: 'Malakas ang chance na maliligo ulit ang nilabhan mo. Today is not the labada Olympics.',
+    reasons: getVerdictReasons('rainy', details),
     short: 'HINDI'
   }
 }
@@ -558,6 +615,18 @@ function App() {
               <p className="text-xs font-extrabold uppercase tracking-[0.18em] opacity-70">Current verdict</p>
               <h2 className="mx-auto mt-2 max-w-full text-[clamp(2.15rem,13vw,4.5rem)] font-extrabold leading-none md:text-7xl">{forecast.verdict.label}</h2>
               <p className="mx-auto mt-4 max-w-3xl text-base font-semibold leading-snug sm:text-lg md:text-2xl">{forecast.verdict.line}</p>
+              {forecast.verdict.reasons?.length > 0 && (
+                <div className="mx-auto mt-5 max-w-3xl rounded-2xl border border-white/35 bg-white/20 p-4 text-left shadow-xl backdrop-blur sm:p-5">
+                  <p className="text-xs font-extrabold uppercase tracking-[0.16em] opacity-70">Bakit ganyan ang verdict?</p>
+                  <div className="mt-3 grid gap-2">
+                    {forecast.verdict.reasons.map((reason) => (
+                      <p key={reason} className="rounded-xl bg-white/25 px-3 py-2 text-sm font-semibold leading-snug text-ink/80 sm:text-base">
+                        {reason}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="mt-6 grid gap-3 sm:gap-4 md:mt-8 md:grid-cols-[1.15fr_.85fr]">
                 <div className="glass-card rounded-2xl p-4 sm:p-6">
