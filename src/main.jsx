@@ -262,7 +262,19 @@ function unpackForecast(data) {
   }))
 
   const future = hours.filter((hour) => new Date(hour.time) >= now)
-  const current = future[0] ?? hours[0]
+  const nearestHour = future[0] ?? hours[0]
+  const current = data.current
+    ? {
+        time: data.current.time,
+        temperature_2m: data.current.temperature_2m,
+        relative_humidity_2m: data.current.relative_humidity_2m,
+        precipitation_probability: nearestHour?.precipitation_probability ?? 0,
+        precipitation: data.current.precipitation ?? 0,
+        wind_speed_10m: data.current.wind_speed_10m,
+        uv_index: nearestHour?.uv_index ?? 0,
+        weather_code: data.current.weather_code
+      }
+    : nearestHour
   const laundryWindow = getBestLaundryWindow(hours, now)
   const summary = summarizeLaundryWindow(laundryWindow)
   const verdict = verdictFromScore(summary.averageScore, summary.worstRain, summary.wettest?.weather_code ?? current.weather_code, {
