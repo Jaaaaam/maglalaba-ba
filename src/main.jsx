@@ -161,21 +161,17 @@ function verdictFromScore(score, rainChance, code, context = {}) {
   const precipitationTotal = context.precipitationTotal ?? 0
   const current = context.current
   const wetHourShare = windowHours ? wetHours / windowHours : 0
-  const currentlyDry = current ? !isWetCode(current.weather_code) && (current.precipitation ?? 0) <= 0.1 : !isWetCode(code)
+  const currentlyDry = current ? (current.precipitation ?? 0) <= 0.1 : !isWetCode(code)
   const currentCode = current?.weather_code ?? code
   const sunnyNow = currentlyDry && isSunnyCode(currentCode)
   const partlySunnyNow = currentlyDry && isPartlySunnyCode(currentCode)
   const hotDryNow = current ? currentlyDry && current.temperature_2m >= 29 && current.relative_humidity_2m <= 78 : false
   const activeRainNow = current ? isWetCode(current.weather_code) && (current.precipitation ?? 0) >= 0.2 : false
   const dailyWetRisk = !windowHours && isWetCode(code) && rainChance >= 80
-  const soggyWindow =
-    dailyWetRisk ||
-    activeRainNow ||
-    precipitationTotal >= 4 ||
-    (isWetCode(code) && wetHours >= 2 && precipitationTotal >= 1.5)
+  const noLaundry = activeRainNow || (!current && dailyWetRisk)
   const details = { activeRainNow, averageRain, hotDryNow, partlySunnyNow, precipitationTotal, score, wetHours, worstRain: rainChance }
 
-  if (!soggyWindow && sunnyNow) {
+  if (!noLaundry && sunnyNow) {
     return {
       key: 'sunny',
       label: 'OO / GO',
@@ -186,7 +182,7 @@ function verdictFromScore(score, rainChance, code, context = {}) {
     }
   }
 
-  if (!soggyWindow && (partlySunnyNow || (hotDryNow && score >= 42))) {
+  if (!noLaundry && (partlySunnyNow || hotDryNow)) {
     return {
       key: 'maybe',
       label: 'SIGURO / MAYBE',
@@ -197,7 +193,7 @@ function verdictFromScore(score, rainChance, code, context = {}) {
     }
   }
 
-  if (!soggyWindow && currentlyDry) {
+  if (!noLaundry && currentlyDry) {
     return {
       key: 'maybe',
       label: 'SIGURO / MAYBE',
