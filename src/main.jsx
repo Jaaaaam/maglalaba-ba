@@ -76,6 +76,24 @@ function weatherIcon(code, size = 34) {
   return <Sun size={size} />
 }
 
+function weatherLabel(hour) {
+  const label = WMO[hour.weather_code] ?? 'Weather'
+
+  if (!isWetCode(hour.weather_code)) {
+    return label
+  }
+
+  if ((hour.precipitation ?? 0) >= 0.2) {
+    return label
+  }
+
+  if ((hour.precipitation_probability ?? 0) >= 80) {
+    return `Possible ${label.toLowerCase()}`
+  }
+
+  return hour.temperature_2m >= 29 ? 'Hot and dry-ish' : 'Cloudy but dry-ish'
+}
+
 function scoreHour(hour) {
   const tempScore = clamp((hour.temperature_2m - 23) * 4.2, 0, 30)
   const humidityScore = clamp((86 - hour.relative_humidity_2m) * 0.55, 0, 24)
@@ -90,10 +108,8 @@ function getVerdictReasons(verdictKey, details) {
   const reasons = []
 
   if (verdictKey === 'sunny') {
-    if (details.averageRain >= 45 || details.worstRain >= 60) {
-      reasons.push(`May rain chance later (${details.averageRain}% average risk), pero ngayon sunny ang bida. Sampay now, chismis with the clouds later.`)
-    } else if (details.averageRain >= 25) {
-      reasons.push(`Tiny rain subplot later (${details.averageRain}% average risk), so keep one eye on the sky while the clothes do their glow-up.`)
+    if (details.averageRain >= 80 || details.worstRain >= 80) {
+      reasons.push(`High rain risk later (${details.averageRain}% average risk), pero ngayon sunny ang bida. Sampay now, bantay lang mamaya.`)
     }
 
     if (details.precipitationTotal > 0 && details.precipitationTotal <= 1) {
@@ -110,10 +126,8 @@ function getVerdictReasons(verdictKey, details) {
       reasons.push('Mainit at dry ngayon, so may laban ang sampay habang cooperative pa ang langit.')
     }
 
-    if (details.averageRain >= 55) {
-      reasons.push(`Average rain risk is ${details.averageRain}%, so may ulan subplot pero hindi pa siya final episode.`)
-    } else if (details.averageRain >= 35) {
-      reasons.push(`Average rain risk is ${details.averageRain}%, kaya puwede pa, basta ready kang sumilip sa bintana.`)
+    if (details.averageRain >= 80 || details.worstRain >= 80) {
+      reasons.push(`Rain risk hits ${Math.max(details.averageRain, details.worstRain)}%, kaya bantay-sampay mode. Hindi panic, just adulting.`)
     } else {
       reasons.push(`Average rain risk is only ${details.averageRain}%, so the forecast is more side-eye than stop sign.`)
     }
@@ -161,12 +175,15 @@ function verdictFromScore(score, rainChance, code, context = {}) {
   const precipitationTotal = context.precipitationTotal ?? 0
   const current = context.current
   const wetHourShare = windowHours ? wetHours / windowHours : 0
-  const currentlyDry = current ? (current.precipitation ?? 0) <= 0.1 : !isWetCode(code)
+  const currentPrecipitation = current?.precipitation ?? 0
+  const currentRainChance = current?.precipitation_probability ?? rainChance
+  const currentlyDry = current ? currentPrecipitation <= 0.1 : !isWetCode(code)
   const currentCode = current?.weather_code ?? code
   const sunnyNow = currentlyDry && isSunnyCode(currentCode)
   const partlySunnyNow = currentlyDry && isPartlySunnyCode(currentCode)
   const hotDryNow = current ? currentlyDry && current.temperature_2m >= 29 && current.relative_humidity_2m <= 78 : false
-  const activeRainNow = current ? isWetCode(current.weather_code) && (current.precipitation ?? 0) >= 0.2 : false
+  const rainRiskOnly = currentlyDry && isWetCode(currentCode) && currentRainChance < 80
+  const activeRainNow = current ? isWetCode(current.weather_code) && currentPrecipitation >= 0.2 : false
   const dailyWetRisk = !windowHours && isWetCode(code) && rainChance >= 80
   const noLaundry = activeRainNow || (!current && dailyWetRisk)
   const details = { activeRainNow, averageRain, hotDryNow, partlySunnyNow, precipitationTotal, score, wetHours, worstRain: rainChance }
@@ -182,7 +199,7 @@ function verdictFromScore(score, rainChance, code, context = {}) {
     }
   }
 
-  if (!noLaundry && (partlySunnyNow || hotDryNow)) {
+  if (!noLaundry && (partlySunnyNow || hotDryNow || rainRiskOnly)) {
     return {
       key: 'maybe',
       label: 'SIGURO / MAYBE',
@@ -720,7 +737,10 @@ function App() {
                         {weatherIcon(hour.weather_code, 23)}
                       </div>
                       <p className="text-sm font-extrabold">{new Date(hour.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                      <p className="mt-1 text-xs font-semibold opacity-70">{WMO[hour.weather_code] ?? 'Weather'}</p>
+                      <p className="mt-1 text-xs font-semibold opacity-70">{weatherLabel(hour)}</p>
+                      {hour.precipitation_probability >= 80 && (
+                        <p className="mt-1 text-[11px] font-bold opacity-60">{hour.precipitation_probability}% rain risk</p>
+                      )}
                       <p className="mt-3 rounded-full bg-white/25 px-2 py-1 text-xs font-extrabold">{verdict.short}</p>
                     </div>
                   )
