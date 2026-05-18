@@ -62,9 +62,17 @@ function isWetCode(code) {
   return [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99].includes(code)
 }
 
+function isSunnyCode(code) {
+  return [0, 1].includes(code)
+}
+
+function isPartlySunnyCode(code) {
+  return [2, 3, 45, 48].includes(code)
+}
+
 function weatherIcon(code, size = 34) {
   if (isWetCode(code)) return <CloudRain size={size} />
-  if ([2, 3, 45, 48].includes(code)) return <Cloud size={size} />
+  if (isPartlySunnyCode(code)) return <Cloud size={size} />
   return <Sun size={size} />
 }
 
@@ -81,7 +89,23 @@ function scoreHour(hour) {
 function getVerdictReasons(verdictKey, details) {
   const reasons = []
 
+  if (verdictKey === 'sunny') {
+    if (details.averageRain >= 45 || details.worstRain >= 60) {
+      reasons.push(`May rain chance later (${details.averageRain}% average risk), pero ngayon sunny ang bida. Sampay now, chismis with the clouds later.`)
+    } else if (details.averageRain >= 25) {
+      reasons.push(`Tiny rain subplot later (${details.averageRain}% average risk), so keep one eye on the sky while the clothes do their glow-up.`)
+    }
+
+    if (details.precipitationTotal > 0 && details.precipitationTotal <= 1) {
+      reasons.push(`Expected rain is only ${details.precipitationTotal} mm in the drying window. The clouds are sending a memo, not a resignation letter.`)
+    }
+  }
+
   if (verdictKey === 'maybe') {
+    if (details.partlySunnyNow) {
+      reasons.push('Partly sunny siya: enough sun for hope, enough clouds for trust issues.')
+    }
+
     if (details.hotDryNow) {
       reasons.push('Mainit at dry ngayon, so may laban ang sampay habang cooperative pa ang langit.')
     }
@@ -138,41 +162,42 @@ function verdictFromScore(score, rainChance, code, context = {}) {
   const current = context.current
   const wetHourShare = windowHours ? wetHours / windowHours : 0
   const currentlyDry = current ? !isWetCode(current.weather_code) && (current.precipitation ?? 0) <= 0.1 : !isWetCode(code)
+  const currentCode = current?.weather_code ?? code
+  const sunnyNow = currentlyDry && isSunnyCode(currentCode)
+  const partlySunnyNow = currentlyDry && isPartlySunnyCode(currentCode)
   const hotDryNow = current ? currentlyDry && current.temperature_2m >= 29 && current.relative_humidity_2m <= 78 : false
-  const widespreadRain = wetHourShare >= 0.35
   const activeRainNow = current ? isWetCode(current.weather_code) && (current.precipitation ?? 0) >= 0.2 : false
   const dailyWetRisk = !windowHours && isWetCode(code) && rainChance >= 80
   const soggyWindow =
     dailyWetRisk ||
     activeRainNow ||
     precipitationTotal >= 4 ||
-    (widespreadRain && averageRain >= 78) ||
     (isWetCode(code) && wetHours >= 2 && precipitationTotal >= 1.5)
-  const details = { activeRainNow, averageRain, hotDryNow, precipitationTotal, score, wetHours }
+  const details = { activeRainNow, averageRain, hotDryNow, partlySunnyNow, precipitationTotal, score, wetHours, worstRain: rainChance }
 
-  if (!soggyWindow && score >= 64 && averageRain < 55 && wetHourShare < 0.34 && currentlyDry) {
+  if (!soggyWindow && sunnyNow) {
     return {
       key: 'sunny',
       label: 'OO / GO',
       chip: 'Sampay confidence: main character',
-      line: 'Maaraw, mahangin, at mukhang kakampi ang langit. Ilabas ang labada, pero huwag kalimutan ang sipit.',
-      reasons: [],
+      line: 'Maaraw ngayon, so go na ang labada. Ilabas ang damit habang main character pa ang araw.',
+      reasons: getVerdictReasons('sunny', details),
       short: 'OO'
     }
   }
 
-  if (!soggyWindow && hotDryNow && score >= 42 && averageRain < 70) {
+  if (!soggyWindow && (partlySunnyNow || (hotDryNow && score >= 42))) {
     return {
       key: 'maybe',
       label: 'SIGURO / MAYBE',
-      chip: 'Mainit ngayon, pero bantay ulap',
-      line: 'Hot and dry right now, so may laban ang sampay. Check mo lang ulit mamaya bago ka mag-full laundry era.',
+      chip: 'May araw, may konting attitude',
+      line: 'Partly sunny or hot enough to try, pero may cloud drama sa gilid. Puwede, basta bantay-sampay mode.',
       reasons: getVerdictReasons('maybe', details),
       short: 'SIGURO'
     }
   }
 
-  if (!soggyWindow && (score >= 35 || averageRain < 85 || wetHourShare < 0.5)) {
+  if (!soggyWindow && currentlyDry) {
     return {
       key: 'maybe',
       label: 'SIGURO / MAYBE',
