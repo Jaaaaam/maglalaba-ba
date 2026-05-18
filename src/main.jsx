@@ -177,13 +177,14 @@ function verdictFromScore(score, rainChance, code, context = {}) {
   const wetHourShare = windowHours ? wetHours / windowHours : 0
   const currentPrecipitation = current?.precipitation ?? 0
   const currentRainChance = current?.precipitation_probability ?? rainChance
-  const currentlyDry = current ? currentPrecipitation <= 0.1 : !isWetCode(code)
+  const meaningfulRainNow = currentPrecipitation >= 0.2 && currentRainChance >= 80
+  const currentlyDry = current ? !meaningfulRainNow : !isWetCode(code) || rainChance < 80
   const currentCode = current?.weather_code ?? code
   const sunnyNow = currentlyDry && isSunnyCode(currentCode)
   const partlySunnyNow = currentlyDry && isPartlySunnyCode(currentCode)
   const hotDryNow = current ? currentlyDry && current.temperature_2m >= 29 && current.relative_humidity_2m <= 78 : false
   const rainRiskOnly = currentlyDry && isWetCode(currentCode) && currentRainChance < 80
-  const activeRainNow = current ? isWetCode(current.weather_code) && currentPrecipitation >= 0.2 : false
+  const activeRainNow = current ? isWetCode(current.weather_code) && meaningfulRainNow : false
   const dailyWetRisk = !windowHours && isWetCode(code) && rainChance >= 80
   const noLaundry = activeRainNow || (!current && dailyWetRisk)
   const details = { activeRainNow, averageRain, hotDryNow, partlySunnyNow, precipitationTotal, score, wetHours, worstRain: rainChance }
