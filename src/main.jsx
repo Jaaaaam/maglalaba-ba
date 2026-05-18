@@ -233,6 +233,19 @@ function summarizeLaundryWindow(window) {
   }
 }
 
+function getHourVerdict(hour) {
+  const score = scoreHour(hour)
+  const wetHours = isWetCode(hour.weather_code) || hour.precipitation >= 0.2 ? 1 : 0
+
+  return verdictFromScore(score, hour.precipitation_probability, hour.weather_code, {
+    averageRain: hour.precipitation_probability,
+    current: hour,
+    precipitationTotal: hour.precipitation,
+    wetHours,
+    windowHours: 1
+  })
+}
+
 function getLaundryWindow(hours, now) {
   const futureDaylight = hours.filter((hour) => {
     const date = new Date(hour.time)
@@ -308,6 +321,8 @@ function unpackForecast(data) {
 
   const daily = data.daily.time.map((time, index) => {
     const rainChance = data.daily.precipitation_probability_max[index] ?? 0
+    const precipitationTotal = data.daily.precipitation_sum[index] ?? 0
+    const code = data.daily.weather_code[index]
     const score = Math.round(
       clamp(
         35 +
@@ -315,17 +330,28 @@ function unpackForecast(data) {
           (data.daily.uv_index_max[index] ?? 0) * 5 +
           (data.daily.wind_speed_10m_max[index] ?? 0) * 0.8 -
           rainChance * 0.8 -
-          (data.daily.precipitation_sum[index] ?? 0) * 18,
+          precipitationTotal * 18,
         0,
         100
       )
     )
-    const verdict = verdictFromScore(score, rainChance, data.daily.weather_code[index])
+    const verdict = verdictFromScore(score, rainChance, code, {
+      averageRain: rainChance,
+      current: {
+        weather_code: code,
+        precipitation: precipitationTotal >= 1.5 ? 0.2 : 0,
+        temperature_2m: data.daily.temperature_2m_max[index],
+        relative_humidity_2m: 70
+      },
+      precipitationTotal,
+      wetHours: isWetCode(code) && precipitationTotal >= 1.5 ? 2 : 0,
+      windowHours: AVERAGE_DRYING_HOURS
+    })
     return {
       time,
       score,
       verdict,
-      code: data.daily.weather_code[index],
+      code,
       rainChance,
       tempMax: Math.round(data.daily.temperature_2m_max[index])
     }
@@ -687,8 +713,7 @@ function App() {
               </div>
               <div className="scroll-strip -mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:-mx-5 sm:px-5 md:mx-0 md:grid md:grid-cols-5 md:overflow-visible md:px-0 md:pb-0">
                 {forecast.timeline.map((hour) => {
-                  const score = scoreHour(hour)
-                  const verdict = verdictFromScore(score, hour.precipitation_probability, hour.weather_code)
+                  const verdict = getHourVerdict(hour)
                   return (
                     <div key={hour.time} className="glass-card min-w-36 shrink-0 snap-start rounded-2xl p-3 text-center sm:p-4 md:min-w-0 md:shrink">
                       <div className={cls('mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full', verdict.key === 'rainy' ? 'bg-red-500/20 text-red-500' : 'bg-aqua/20 text-sky')}>
